@@ -11,11 +11,17 @@ class Container:
     def push(self, item):
         pass
 
-    def pull(self, item):
+    def pull(self):
+        pass
+
+    def view_next(self):
         pass
 
     def __str__(self):
         return str(self._tokens)
+
+    def __len__(self):
+        return len(self._tokens)
 
 
 class Stack(Container):
@@ -23,8 +29,11 @@ class Stack(Container):
     def push(self, item):
         self._tokens.append(item)
 
-    def pull(self, item):
+    def pull(self):
         return self._tokens.pop()
+
+    def view_next(self):
+        return self._tokens[-1] if len(self._tokens) else None
 
 
 class Queue(Container):
@@ -32,5 +41,8 @@ class Queue(Container):
     def push(self, item):
         self._tokens.append(item)
 
-    def pull(self, item):
-        self._tokens.popleft()
+    def pull(self):
+        return self._tokens.popleft()
+
+    def view_next(self):
+        return self._tokens[0] if len(self._tokens) else None
