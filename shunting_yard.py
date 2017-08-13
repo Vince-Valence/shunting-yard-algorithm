@@ -1,11 +1,12 @@
 from stack_queue import Stack, Queue
+import operator
 
 
 class Operator:
 
-    """A non alphabetical one character long symbol (e.g., "+")."""
+    """A mathematical operator or function (e.g., "+", "max")."""
 
-    def __init__(self, symbol, precedence, arity, associativity, actual_function):
+    def __init__(self, symbol, precedence, arity=None, associativity=None, actual_function=None):
 
         """
         :parameter symbol: a non alphabetical character. Should be unique among Operators (and Functions).
@@ -27,53 +28,30 @@ class Operator:
 
         return self.symbol == other.symbol if type(other) == Operator else self.symbol == other
 
-    def __lt__(self, other):
+    def __ge__(self, other):
 
         """Compares operators arities."""
 
-        return self.arity < other.arity
+        return self.precedence >= other.precedence
 
+    def __str__(self):
 
-class Function:
-
-    """A sequence of letters representing a mathematical function (e.g., "max") with a fixed number of parameters."""
-
-    def __init__(self, name, params, actual_function):
-
-        """
-        :parameter name: name of the function used for identification. Should be unique among Functions (and Operators).
-        :parameter params: number of parameters that the function takes.
-        :parameter actual_function: python function used for expression evaluation.
-        """
-
-        self.name = name
-        self.params = params
-        self.actual_function = actual_function
-
-    def __eq__(self, other):
-
-        """:parameter other: Operator or string."""
-
-        return self.name == other.name if type(other) == Function else self.name == other
+        return self.symbol
 
 
 class ShuntingYard:
 
-    def __init__(self, functions=(), operators=(), load_basic=True):
+    def __init__(self, operators=(), load_basic=True):
 
         """
-        :parameter functions: dictionary of functions with their names as keys.
         :parameter operators: dictionary of operators with their symbols as keys.
         :parameter load_basic: boolean indicating whether to load basic functions and operators.
         """
 
-        self.functions = {f.name: f for f in functions}
         self.operators = {op.symbol: op for op in operators}
-        self.postfix = None  # Last output of the algorithm
 
         if load_basic:
-            # TODO: load basic functions and operators into the attributes
-            pass
+            self._load_basic()
 
     def parse(self, expression):
 
@@ -87,32 +65,64 @@ class ShuntingYard:
         output_tokens = Queue()
         operator_stack = Stack()
 
-        while len(input_tokens):
+        while input_tokens:
             token = input_tokens.pull()
-            if token.isnumeric():  # If the token is a number
+            if self._is_number(token):  # If the token is a number
                 output_tokens.push(token)
             if token in self.operators:  # If the token is an operator
                 next_op = operator_stack.view_next()
-                while next_op in self.operators and \
-                        self.operators[next_op] >= self.operators[token] and \
-                        next_op.associativity == "left":
+                while next_op in self.operators and self.operators[next_op] >= self.operators[token] and \
+                        self.operators[token].associativity == "left":
                     output_tokens.push(operator_stack.pull())
                     next_op = operator_stack.view_next()
                 operator_stack.push(token)
             if token is '(':
                 operator_stack.push(token)
-            if token is ')':
-                while operator_stack.view_next() is not '(':
+            if token is ')' or token is ',':
+                while operator_stack.view_next() and operator_stack.view_next() is not '(':
                     output_tokens.push(operator_stack.pull())
-                operator_stack.pull()  # Pull the left bracket
+                if token is ')':
+                    operator_stack.pull()  # Pull the left bracket
         while operator_stack:
             output_tokens.push(operator_stack.pull())
 
-        self.postfix = output_tokens
         return output_tokens
 
+    def evaluate(self, postfix_tokens):
+
+        """
+        Evaluates a postfix expression and returns its value.
+        :parameter postfix_tokens: queue, as returned by the parse function of this class
+        """
+
+        result_stack = Stack()
+        operation_stack = Stack()
+
+        while postfix_tokens:
+            token = postfix_tokens.pull()
+            if token in self.operators:
+                op = self.operators[token]
+                for operand in range(op.arity):
+                    operation_stack.push(result_stack.pull())
+                result_stack.push(op.actual_function(*(float(operation_stack.pull()) for operand in range(op.arity))))
+
+            else:
+                result_stack.push(token)
+
+        return result_stack.pull()
+
     def _load_basic(self):
-        pass
+
+        """Loads basic operators and functions for the algorithm to recognize in expressions."""
+
+        basic_ops = (Operator('+', 2, 2, "left", operator.add),
+                     Operator('-', 2, 2, "left", operator.sub),
+                     Operator('*', 3, 2, "left", operator.mul),
+                     Operator('/', 3, 2, "left", operator.truediv),
+                     Operator('^', 4, 2, "right", operator.pow),
+                     Operator('max', 5, 2, actual_function=max),
+                     Operator('min', 5, 2, actual_function=min))
+        self.operators.update({op.symbol: op for op in basic_ops})
 
     @staticmethod
     def _tokenize(expression):
@@ -144,9 +154,19 @@ class ShuntingYard:
             else:  # If the character is a single character operator
                 char_index += 1
 
-            if token_start_char is not ",":  # The commas are not used in the Shunting Yard Algorithm
-                tokens.push(expression[token_index: char_index])  # Add the found token to the queue
+            tokens.push(expression[token_index: char_index])  # Add the found token to the queue
 
             token_index = char_index
-        print(tokens)
         return tokens
+
+    @staticmethod
+    def _is_number(string):
+
+        """Helper method for the algorithm (parse function)."""
+
+        try:
+            float(string)
+        except ValueError:
+            return False
+        else:
+            return True

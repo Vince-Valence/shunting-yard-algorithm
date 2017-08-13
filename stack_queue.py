@@ -20,8 +20,8 @@ class Container:
     def __str__(self):
         return str(self._tokens)
 
-    def __len__(self):
-        return len(self._tokens)
+    def __bool__(self):
+        return bool(self._tokens)
 
 
 class Stack(Container):
